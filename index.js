@@ -18,13 +18,13 @@ class RSSHarvester {
     try {
       await this.db.connect();
       this.isRunning = true;
-      
+
       console.log(`Starting RSS harvester...`);
       console.log(`Monitoring ${this.feeds.length} feeds every ${this.interval / 1000} seconds`);
-      
+
       // Initial fetch
       await this.checkFeeds();
-      
+
       // Set up periodic checking
       this.intervalId = setInterval(async () => {
         if (this.isRunning) {
@@ -44,7 +44,7 @@ class RSSHarvester {
 
   async checkFeeds() {
     console.log('\n--- Checking RSS feeds ---');
-    
+
     for (const feedUrl of this.feeds) {
       try {
         const items = await this.parser.fetchFeed(feedUrl);
@@ -62,22 +62,46 @@ class RSSHarvester {
         console.error(`Error processing feed ${feedUrl}:`, error.message);
       }
     }
-    
+
     console.log('--- Feed check complete ---\n');
   }
 
   async stop() {
     console.log('\nShutting down RSS harvester...');
     this.isRunning = false;
-    
+
     if (this.intervalId) {
       clearInterval(this.intervalId);
     }
-    
+
     await this.db.close();
     process.exit(0);
   }
 }
+
+const http = require('http');
+
+// Create a basic HTTP server for healthcheck
+const server = http.createServer((req, res) => {
+  if (req.url === '/healthcheck') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: harvester.isRunning ? 'running' : 'stopped',
+      feeds: harvester.feeds.length,
+      intervalSeconds: harvester.interval / 1000
+    }));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
+  }
+});
+
+// Start the server on a configurable port or default to 3000
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Healthcheck server listening on port ${PORT}`);
+});
+
 
 // Start the harvester
 const harvester = new RSSHarvester();
