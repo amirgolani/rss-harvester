@@ -1,6 +1,7 @@
 require('dotenv').config();
 const Database = require('./db');
-const RSSParser = require('./rssParser');
+const RSSParser = require('./rssParser'); // you must define this separately
+const http = require('http');
 
 class RSSHarvester {
   constructor() {
@@ -10,8 +11,9 @@ class RSSHarvester {
       'https://feeds.feedburner.com/TechCrunch',
       'https://rss.cnn.com/rss/edition.rss'
     ];
-    this.interval = parseInt(process.env.CHECK_INTERVAL) || 300000; // 1 hour default
+    this.interval = parseInt(process.env.CHECK_INTERVAL) || 3600000; // 1 hour default
     this.isRunning = false;
+    this.lastCheckedAt = null;
   }
 
   async start() {
@@ -22,20 +24,16 @@ class RSSHarvester {
       console.log(`Starting RSS harvester...`);
       console.log(`Monitoring ${this.feeds.length} feeds every ${this.interval / 1000} seconds`);
 
-      // Initial fetch
       await this.checkFeeds();
 
-      // Set up periodic checking
       this.intervalId = setInterval(async () => {
         if (this.isRunning) {
           await this.checkFeeds();
         }
       }, this.interval);
 
-      // Handle graceful shutdown
       process.on('SIGINT', () => this.stop());
       process.on('SIGTERM', () => this.stop());
-
     } catch (error) {
       console.error('Failed to start RSS harvester:', error);
       process.exit(1);
@@ -44,6 +42,7 @@ class RSSHarvester {
 
   async checkFeeds() {
     console.log('\n--- Checking RSS feeds ---');
+    this.lastCheckedAt = new Date();
 
     for (const feedUrl of this.feeds) {
       try {
@@ -66,6 +65,17 @@ class RSSHarvester {
     console.log('--- Feed check complete ---\n');
   }
 
+  async getStatus() {
+    const itemCount = await this.db.collection.countDocuments();
+    return {
+      status: this.isRunning ? 'running' : 'stopped',
+      feeds: this.feeds.length,
+      intervalSeconds: this.interval / 1000,
+      lastCheckedAt: this.lastCheckedAt,
+      itemsStored: itemCount
+    };
+  }
+
   async stop() {
     console.log('\nShutting down RSS harvester...');
     this.isRunning = false;
@@ -79,10 +89,11 @@ class RSSHarvester {
   }
 }
 
-const http = require('http');
+// Instantiate harvester
+const harvester = new RSSHarvester();
 
-// Create a basic HTTP server for healthcheck
-const server = http.createServer((req, res) => {
+// HTTP server for healthcheck + status
+const server = http.createServer(async (req, res) => {
   if (req.url === '/healthcheck') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
@@ -90,21 +101,28 @@ const server = http.createServer((req, res) => {
       feeds: harvester.feeds.length,
       intervalSeconds: harvester.interval / 1000
     }));
+  } else if (req.url === '/status') {
+    try {
+      const status = await harvester.getStatus();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(status));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to fetch status' }));
+    }
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
   }
 });
 
-// Start the server on a configurable port or default to 3000
+// Start server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Healthcheck server listening on port ${PORT}`);
 });
 
-
-// Start the harvester
-const harvester = new RSSHarvester();
+// Start harvester
 harvester.start().catch(error => {
   console.error('Fatal error:', error);
   process.exit(1);
