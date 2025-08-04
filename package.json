@@ -1,0 +1,28 @@
+{
+  "name": "rss-harvest",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/BILD-EPI/rss-harvest#readme",
+  "bugs": {
+    "url": "https://github.com/BILD-EPI/rss-harvest/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BILD-EPI/rss-harvest.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "mongodb": "^6.18.0",
+    "rss-parser": "^3.13.0"
+  }
+}
