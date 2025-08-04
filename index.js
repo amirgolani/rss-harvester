@@ -11,7 +11,7 @@ class RSSHarvester {
       'https://feeds.feedburner.com/TechCrunch',
       'https://rss.cnn.com/rss/edition.rss'
     ];
-    this.interval = parseInt(process.env.CHECK_INTERVAL) || 300000; // 1 hour default
+    this.interval = parseInt(process.env.CHECK_INTERVAL) || 30000; // 1 hour default
     this.isRunning = false;
     this.lastCheckedAt = null;
   }
