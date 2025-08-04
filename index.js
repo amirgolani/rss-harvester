@@ -8,10 +8,9 @@ class RSSHarvester {
     this.db = new Database();
     this.parser = new RSSParser();
     this.feeds = process.env.RSS_FEEDS ? process.env.RSS_FEEDS.split(',') : [
-      'https://feeds.feedburner.com/TechCrunch',
-      'https://rss.cnn.com/rss/edition.rss'
+      'https://www.bild.de/feed/alles.xml'
     ];
-    this.interval = parseInt(process.env.CHECK_INTERVAL) || 30000; // 1 hour default
+    this.interval = 30000;
     this.isRunning = false;
     this.lastCheckedAt = null;
   }
