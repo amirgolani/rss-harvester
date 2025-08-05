@@ -109,6 +109,16 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Failed to fetch status' }));
     }
+  } else if (req.url === '/titles') {
+    try {
+      const titles = await harvester.db.collection.find({}, { projection: { title: 1, _id: 0 } }).toArray();
+      const titleArray = titles.map(item => item.title);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(titleArray));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to fetch titles' }));
+    }
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not Found');
