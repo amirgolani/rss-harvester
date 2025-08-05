@@ -111,10 +111,19 @@ app.get('/status', async (req, res) => {
   }
 });
 
+app.get('/', async (req, res) => {
+  try {
+    const status = await harvester.getStatus();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch status' });
+  }
+});
+
 app.get('/titles', async (req, res) => {
   try {
     const { searchTitle, searchCat } = req.query;
-    
+
     // Build MongoDB query with regex filters
     const query = {};
     if (searchTitle) {
@@ -123,22 +132,22 @@ app.get('/titles', async (req, res) => {
     if (searchCat) {
       query.categories = { $regex: searchCat, $options: 'i' };
     }
-    
-    const items = await harvester.db.collection.find(query, { 
-      projection: { 
-        title: 1, 
-        description: 1, 
-        categories: 1, 
-        pubDate: 1, 
-        _id: 0 
-      } 
-    }).toArray();
-    
+
+    const items = await harvester.db.collection.find(query, {
+      projection: {
+        title: 1,
+        description: 1,
+        categories: 1,
+        createdAt: 1,
+        _id: 0
+      }
+    }).sort({ createdAt: -1 }).toArray();
+
     const formattedItems = items.map(item => ({
       title: item.title || '',
       description: item.description || '',
       categories: item.categories || [],
-      pubDate: item.pubDate
+      createdAt: item.createdAt
     }));
     res.json(formattedItems);
   } catch (err) {
