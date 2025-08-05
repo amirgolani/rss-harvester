@@ -1,7 +1,7 @@
 require('dotenv').config();
 const Database = require('./db');
 const RSSParser = require('./rssParser'); // you must define this separately
-const http = require('http');
+const express = require('express');
 
 class RSSHarvester {
   constructor() {
@@ -91,57 +91,65 @@ class RSSHarvester {
 // Instantiate harvester
 const harvester = new RSSHarvester();
 
-// HTTP server for healthcheck + status
-const server = http.createServer(async (req, res) => {
-  if (req.url === '/healthcheck') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      status: harvester.isRunning ? 'running' : 'stopped',
-      feeds: harvester.feeds.length,
-      intervalSeconds: harvester.interval / 1000
+// Express app
+const app = express();
+
+app.get('/healthcheck', (req, res) => {
+  res.json({
+    status: harvester.isRunning ? 'running' : 'stopped',
+    feeds: harvester.feeds.length,
+    intervalSeconds: harvester.interval / 1000
+  });
+});
+
+app.get('/status', async (req, res) => {
+  try {
+    const status = await harvester.getStatus();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch status' });
+  }
+});
+
+app.get('/titles', async (req, res) => {
+  try {
+    const { searchTitle, searchCat } = req.query;
+    
+    // Build MongoDB query with regex filters
+    const query = {};
+    if (searchTitle) {
+      query.title = { $regex: searchTitle, $options: 'i' };
+    }
+    if (searchCat) {
+      query.categories = { $regex: searchCat, $options: 'i' };
+    }
+    
+    const items = await harvester.db.collection.find(query, { 
+      projection: { 
+        title: 1, 
+        description: 1, 
+        categories: 1, 
+        pubDate: 1, 
+        _id: 0 
+      } 
+    }).toArray();
+    
+    const formattedItems = items.map(item => ({
+      title: item.title || '',
+      description: item.description || '',
+      categories: item.categories || [],
+      pubDate: item.pubDate
     }));
-  } else if (req.url === '/status') {
-    try {
-      const status = await harvester.getStatus();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(status));
-    } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Failed to fetch status' }));
-    }
-  } else if (req.url === '/titles') {
-    try {
-      const items = await harvester.db.collection.find({}, { 
-        projection: { 
-          title: 1, 
-          description: 1, 
-          categories: 1, 
-          pubDate: 1, 
-          _id: 0 
-        } 
-      }).toArray();
-      const formattedItems = items.map(item => ({
-        title: item.title || '',
-        description: item.description || '',
-        categories: item.categories || [],
-        pubDate: item.pubDate
-      }));
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(formattedItems));
-    } catch (err) {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Failed to fetch titles' }));
-    }
-  } else {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not Found');
+    res.json(formattedItems);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch titles' });
   }
 });
 
 // Start server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Healthcheck server listening on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
 });
 
 // Start harvester
