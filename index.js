@@ -111,10 +111,23 @@ const server = http.createServer(async (req, res) => {
     }
   } else if (req.url === '/titles') {
     try {
-      const titles = await harvester.db.collection.find({}, { projection: { title: 1, _id: 0 } }).toArray();
-      const titleArray = titles.map(item => item.title);
+      const items = await harvester.db.collection.find({}, { 
+        projection: { 
+          title: 1, 
+          description: 1, 
+          categories: 1, 
+          pubDate: 1, 
+          _id: 0 
+        } 
+      }).toArray();
+      const formattedItems = items.map(item => ({
+        title: item.title || '',
+        description: item.description || '',
+        categories: item.categories || [],
+        pubDate: item.pubDate
+      }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(titleArray));
+      res.end(JSON.stringify(formattedItems));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Failed to fetch titles' }));
